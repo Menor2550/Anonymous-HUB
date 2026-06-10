@@ -1,0 +1,478 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local ENABLE_KEY = Enum.KeyCode.F
+local MENU_KEY = Enum.KeyCode.K
+local AIM_STRENGTH = 0.15
+local MAX_DISTANCE = 150
+
+local isLocked = false
+local targetPlayer = nil
+local isMenuOpen = true
+
+local ESPEnabled = false
+local ESPSettings = {
+	Skeleton = false,
+	Box = false,
+	Name = false,
+	HealthBar = false
+}
+
+local ESPObjects = {}
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdvancedCheatGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local NotificationFrame = Instance.new("Frame")
+NotificationFrame.Size = UDim2.new(0, 400, 0, 500)
+NotificationFrame.Position = UDim2.new(0, 200, 0, 100)
+NotificationFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+NotificationFrame.BorderSizePixel = 0
+NotificationFrame.Visible = false
+NotificationFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = NotificationFrame
+
+local BorderFrame = Instance.new("Frame")
+BorderFrame.Name = "Border"
+BorderFrame.BackgroundColor3 = Color3.fromRGB(0, 255, 170)
+BorderFrame.BorderSizePixel = 0
+BorderFrame.Position = UDim2.new(0, 0, 0, 0)
+BorderFrame.Size = UDim2.new(1, 0, 1, 0)
+BorderFrame.ZIndex = 0
+BorderFrame.Parent = NotificationFrame
+
+local BorderCorner = Instance.new("UICorner")
+BorderCorner.CornerRadius = UDim.new(0, 12)
+BorderCorner.Parent = BorderFrame
+
+local BorderGradient = Instance.new("UIGradient")
+BorderGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 170)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 100, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 100))
+})
+BorderGradient.Parent = BorderFrame
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ContentFrame.BorderSizePixel = 0
+ContentFrame.Position = UDim2.new(0, 3, 0, 3)
+ContentFrame.Size = UDim2.new(1, -6, 1, -6)
+ContentFrame.Parent = NotificationFrame
+
+local ContentCorner = Instance.new("UICorner")
+ContentCorner.CornerRadius = UDim.new(0, 10)
+ContentCorner.Parent = ContentFrame
+
+local DragHandle = Instance.new("Frame")
+DragHandle.BackgroundTransparency = 1
+DragHandle.Size = UDim2.new(1, 0, 0, 50)
+DragHandle.Position = UDim2.new(0, 0, 0, 0)
+DragHandle.Parent = ContentFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Size = UDim2.new(1, 0, 0, 50)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+TitleLabel.Text = "ADVANCED CHEAT SYSTEM"
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 22
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = DragHandle
+
+local TabContainer = Instance.new("Frame")
+TabContainer.BackgroundTransparency = 1
+TabContainer.Size = UDim2.new(1, 0, 0, 40)
+TabContainer.Position = UDim2.new(0, 0, 0, 50)
+TabContainer.Parent = ContentFrame
+
+local MainContainer = Instance.new("Frame")
+MainContainer.BackgroundTransparency = 1
+MainContainer.Size = UDim2.new(1, 0, 1, -90)
+MainContainer.Position = UDim2.new(0, 0, 0, 90)
+MainContainer.Parent = ContentFrame
+
+local function createTabButton(tabName, isLeft, isActive)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.5, -5, 0, 30)
+	if isLeft then
+		btn.Position = UDim2.new(0, 0, 0, 0)
+	else
+		btn.Position = UDim2.new(0.5, 5, 0, 0)
+	end
+
+	local bgColor = Color3.fromRGB(30, 30, 30)
+	local textColor = Color3.fromRGB(200, 200, 200)
+
+	if isActive then
+		bgColor = Color3.fromRGB(40, 40, 40)
+		textColor = Color3.fromRGB(0, 255, 170)
+	end
+
+	btn.BackgroundColor3 = bgColor
+	btn.BorderSizePixel = 0
+	btn.Text = tabName
+	btn.Font = Enum.Font.GothamMedium
+	btn.TextSize = 14
+	btn.TextColor3 = textColor
+	btn.Parent = TabContainer
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = btn
+
+	return btn
+end
+
+local aimTabBtn = createTabButton("Aim Assist", true, true)
+local espTabBtn = createTabButton("ESP / Visuals", false, false)
+
+local aimFrame = Instance.new("ScrollingFrame")
+aimFrame.BackgroundTransparency = 1
+aimFrame.Size = UDim2.new(1, 0, 1, 0)
+aimFrame.Position = UDim2.new(0, 0, 0, 0)
+aimFrame.Visible = true
+aimFrame.CanvasSize = UDim2.new(0, 0, 0, 300)
+aimFrame.ScrollBarThickness = 0
+aimFrame.Parent = MainContainer
+
+local espFrame = Instance.new("ScrollingFrame")
+espFrame.BackgroundTransparency = 1
+espFrame.Size = UDim2.new(1, 0, 1, 0)
+espFrame.Position = UDim2.new(0, 0, 0, 0)
+espFrame.Visible = false
+espFrame.CanvasSize = UDim2.new(0, 0, 0, 300)
+espFrame.ScrollBarThickness = 0
+espFrame.Parent = MainContainer
+
+local function createToggle(parent, text, yPos, defaultState, callback)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -20, 0, 40)
+	frame.Position = UDim2.new(0, 10, 0, yPos)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	frame.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = frame
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(0.7, 0, 1, 0)
+	label.Position = UDim2.new(0, 10, 0, 0)
+	label.Text = text
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 14
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = frame
+
+	local currentState = defaultState
+
+	local toggleBtn = Instance.new("TextButton")
+	toggleBtn.Size = UDim2.new(0, 50, 0, 30)
+	toggleBtn.Position = UDim2.new(1, -60, 0, 5)
+
+	local function updateToggle()
+		if currentState then
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 170)
+			toggleBtn.Text = "ON"
+		else
+			toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			toggleBtn.Text = "OFF"
+		end
+	end
+
+	toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	toggleBtn.BorderSizePixel = 0
+	toggleBtn.Font = Enum.Font.GothamBold
+	toggleBtn.TextSize = 12
+	toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	toggleBtn.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 4)
+	btnCorner.Parent = toggleBtn
+
+	updateToggle()
+
+	toggleBtn.MouseButton1Click:Connect(function()
+		currentState = not currentState
+		updateToggle()
+		if callback then
+			callback(currentState)
+		end
+	end)
+end
+
+createToggle(aimFrame, "Enable Aim Assist (F)", 10, false, function(state)
+	if state then
+		isLocked = false
+		targetPlayer = nil
+	end
+end)
+
+createToggle(espFrame, "Enable ESP", 10, false, function(state)
+	ESPEnabled = state
+	if not state then
+		for _, obj in pairs(ESPObjects) do
+			pcall(function() if obj.Container then obj.Container:Destroy() end end)
+		end
+		ESPObjects = {}
+	end
+end)
+
+createToggle(espFrame, "Show Skeleton", 60, false, function(state)
+	ESPSettings.Skeleton = state
+end)
+
+createToggle(espFrame, "Show Box", 110, false, function(state)
+	ESPSettings.Box = state
+end)
+
+createToggle(espFrame, "Show Name", 160, false, function(state)
+	ESPSettings.Name = state
+end)
+
+createToggle(espFrame, "Show Health Bar", 210, false, function(state)
+	ESPSettings.HealthBar = state
+end)
+
+aimTabBtn.MouseButton1Click:Connect(function()
+	aimFrame.Visible = true
+	espFrame.Visible = false
+	aimTabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	aimTabBtn.TextColor3 = Color3.fromRGB(0, 255, 170)
+	espTabBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	espTabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+end)
+
+espTabBtn.MouseButton1Click:Connect(function()
+	aimFrame.Visible = false
+	espFrame.Visible = true
+	espTabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	espTabBtn.TextColor3 = Color3.fromRGB(0, 255, 170)
+	aimTabBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	aimTabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+end)
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -40, 0, 10)
+CloseButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+CloseButton.BorderSizePixel = 0
+CloseButton.Text = "X"
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 18
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Parent = ContentFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+	NotificationFrame.Visible = false
+	isMenuOpen = false
+end)
+
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function update(input)
+	local delta = input.Position - dragStart
+	NotificationFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+DragHandle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = NotificationFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+DragHandle.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.TouchMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+local function getNearestPlayer()
+	local nearest = nil
+	local nearestDistance = MAX_DISTANCE
+	local mousePos = Camera.ViewportSize / 2
+	for _, player in ipairs(Players.GetPlayers(Players)) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local head = player.Character:FindFirstChild("Head")
+			if head then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+				if onScreen then
+					local distance = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+					if distance < nearestDistance then
+						nearestDistance = distance
+						nearest = player
+					end
+				end
+			end
+		end
+	end
+	return nearest
+end
+
+local function lockOn()
+	if not isLocked or not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Head") then
+		return
+	end
+	local head = targetPlayer.Character.Head
+	local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then
+		return
+	end
+	local targetPos = head.Position
+	local currentCFrame = Camera.CFrame
+	local lookAtCFrame = CFrame.new(currentCFrame.Position, targetPos)
+	local smoothCFrame = currentCFrame:Lerp(lookAtCFrame, AIM_STRENGTH)
+	Camera.CFrame = smoothCFrame
+end
+
+local function createESP(player)
+	if ESPObjects[player] then return end
+	local character = player.Character
+	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+
+	local espContainer = Instance.new("Model")
+	espContainer.Name = "ESP_" .. player.Name
+	espContainer.Parent = workspace
+
+	ESPObjects[player] = {
+		Container = espContainer,
+		Box = {},
+		Skeleton = {},
+		NameTag = nil,
+		HealthBar = nil
+	}
+
+	if ESPSettings.Name then
+		local billboard = Instance.new("BillboardGui")
+		local targetPart = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+		if targetPart then
+			billboard.Adornee = targetPart
+			billboard.Size = UDim2.new(0, 200, 0, 50)
+			billboard.StudsOffset = Vector3.new(0, 3, 0)
+			billboard.Parent = espContainer
+
+			local frame = Instance.new("Frame")
+			frame.Size = UDim2.new(1, 0, 1, 0)
+			frame.BackgroundTransparency = 1
+			frame.Parent = billboard
+
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.new(1, 0, 0.5, 0)
+			label.Position = UDim2.new(0, 0, 0, 0)
+			label.BackgroundTransparency = 1
+			label.Text = player.Name
+			label.Font = Enum.Font.GothamBold
+			label.TextSize = 18
+			label.TextColor3 = Color3.fromRGB(255, 0, 0)
+			label.TextStrokeTransparency = 0
+			label.Parent = frame
+
+			ESPObjects[player].NameTag = label
+		end
+	end
+end
+
+local function updateESP()
+	if not ESPEnabled then return end
+
+	for _, player in ipairs(Players.GetPlayers(Players)) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			if not ESPObjects[player] then
+				createESP(player)
+			end
+		end
+	end
+
+	for player, objects in pairs(ESPObjects) do
+		if not player or not player.Character or not objects.Container.Parent then
+			if objects.Container then 
+				pcall(function() objects.Container:Destroy() end) 
+			end
+			ESPObjects[player] = nil
+		end
+	end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == MENU_KEY then
+		isMenuOpen = not isMenuOpen
+		NotificationFrame.Visible = isMenuOpen
+		return
+	end
+	if input.KeyCode == ENABLE_KEY then
+		if isLocked then
+			isLocked = false
+			targetPlayer = nil
+		else
+			targetPlayer = getNearestPlayer()
+			if targetPlayer then
+				isLocked = true
+			end
+		end
+		return
+	end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+	isLocked = false
+	targetPlayer = nil
+	for _, obj in pairs(ESPObjects) do
+		pcall(function() if obj.Container then obj.Container:Destroy() end end)
+	end
+	ESPObjects = {}
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	if ESPObjects[player] then
+		pcall(function() if ESPObjects[player].Container then ESPObjects[player].Container:Destroy() end end)
+		ESPObjects[player] = nil
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if isLocked and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+		lockOn()
+	end
+	if ESPEnabled then
+		updateESP()
+	end
+end)
+
+if isMenuOpen then
+	NotificationFrame.Visible = true
+end
