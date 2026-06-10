@@ -228,6 +228,26 @@ createToggle(espFrame, "Enable ESP (Highlight)", 10, false, function(state)
 			pcall(function() if obj.Billboard then obj.Billboard:Destroy() end end)
 		end
 		ESPObjects = {}
+	else
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer then
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					if not ESPObjects[player] or not ESPObjects[player].Highlight or not ESPObjects[player].Highlight.Parent or ESPObjects[player].Highlight.Parent ~= player.Character then
+						if ESPObjects[player] then
+							if ESPObjects[player].Highlight then ESPObjects[player].Highlight:Destroy() end
+							if ESPObjects[player].Billboard then ESPObjects[player].Billboard:Destroy() end
+							ESPObjects[player] = nil
+						end
+						local highlight = Instance.new("Highlight")
+						highlight.FillTransparency = 0.5
+						highlight.OutlineColor = Color3.fromRGB(0, 255, 170)
+						highlight.FillColor = Color3.fromRGB(0, 255, 170)
+						highlight.Parent = player.Character
+						ESPObjects[player] = { Highlight = highlight }
+					end
+				end
+			end
+		end
 	end
 end)
 
@@ -374,26 +394,76 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-local function updateESP()
-	if not ESPEnabled then return end
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			if not ESPObjects[player] then
-				local highlight = Instance.new("Highlight")
-				highlight.FillTransparency = 0.5
-				highlight.OutlineColor = Color3.fromRGB(0, 255, 170)
-				highlight.FillColor = Color3.fromRGB(0, 255, 170)
-				highlight.Parent = player.Character
-				ESPObjects[player] = { Highlight = highlight }
-			end
+local function removeESP(player)
+	if ESPObjects[player] then
+		if ESPObjects[player].Highlight then
+			ESPObjects[player].Highlight:Destroy()
 		end
+		if ESPObjects[player].Billboard then
+			ESPObjects[player].Billboard:Destroy()
+		end
+		ESPObjects[player] = nil
 	end
 end
+
+local function addESP(player)
+	if player == LocalPlayer or not ESPEnabled then return end
+	
+	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		removeESP(player)
+		local highlight = Instance.new("Highlight")
+		highlight.FillTransparency = 0.5
+		highlight.OutlineColor = Color3.fromRGB(0, 255, 170)
+		highlight.FillColor = Color3.fromRGB(0, 255, 170)
+		highlight.Parent = player.Character
+		ESPObjects[player] = { Highlight = highlight }
+	end
+end
+
+Players.PlayerAdded:Connect(function(player)
+	addESP(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	removeESP(player)
+end)
 
 LocalPlayer.CharacterAdded:Connect(function()
 	isLocked = false
 	targetPlayer = nil
 end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer then
+		addESP(player)
+	end
+end
+
+local function updateESP()
+	if not ESPEnabled then 
+		for player, _ in pairs(ESPObjects) do
+			removeESP(player)
+		end
+		return 
+	end
+	
+	for player, espData in pairs(ESPObjects) do
+		if not player or not player.Parent or not espData or not espData.Highlight or not espData.Highlight.Parent or espData.Highlight.Parent ~= player.Character or (player.Character and not player.Character:FindFirstChild("HumanoidRootPart")) then
+			removeESP(player)
+			if player and player.Parent and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				addESP(player)
+			end
+		end
+	end
+	
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			if not ESPObjects[player] or not ESPObjects[player].Highlight or not ESPObjects[player].Highlight.Parent or ESPObjects[player].Highlight.Parent ~= player.Character then
+				addESP(player)
+			end
+		end
+	end
+end
 
 RunService.RenderStepped:Connect(function()
 	if isLocked and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
