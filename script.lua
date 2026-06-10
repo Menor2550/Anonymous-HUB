@@ -22,6 +22,7 @@ local ESPSettings = {
 
 local ESPObjects = {}
 local verifiedTitleObject = nil
+local isVerifiedTitleEnabled = false
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AdvancedCheatGUI"
@@ -254,8 +255,9 @@ createToggle(espFrame, "Enable ESP (Highlight)", 10, false, function(state)
 end)
 
 createToggle(espFrame, "Verified Title", 60, false, function(state)
+	isVerifiedTitleEnabled = state
 	if state then
-		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
 			if not verifiedTitleObject then
 				local billboard = Instance.new("BillboardGui")
 				billboard.Name = "VerifiedTitle"
@@ -462,60 +464,122 @@ Players.PlayerRemoving:Connect(function(player)
 	removeESP(player)
 end)
 
+-- Modern Fly System (LinearVelocity + AlignOrientation)
 local isFlying = false
-local flySpeed = 50
+local flySpeed = 80
+local flyAttachment = nil
+local flyLinearVelocity = nil
+local flyAlignOrientation = nil
 
-LocalPlayer.Chatted:Connect(function(message)
-	if message == "/fly" then
-		isFlying = not isFlying
-		if isFlying then
-			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+local function setupFlyObjects(character)
+	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+
+	-- Clean up existing
+	cleanupFlyObjects()
+
+	-- Create Attachment
+	flyAttachment = Instance.new("Attachment")
+	flyAttachment.Parent = hrp
+
+	-- Create LinearVelocity
+	flyLinearVelocity = Instance.new("LinearVelocity")
+	flyLinearVelocity.Attachment0 = flyAttachment
+	flyLinearVelocity.MaxForce = math.huge
+	flyLinearVelocity.Enabled = false
+	flyLinearVelocity.Parent = hrp
+
+	-- Create AlignOrientation
+	flyAlignOrientation = Instance.new("AlignOrientation")
+	flyAlignOrientation.Attachment0 = flyAttachment
+	flyAlignOrientation.MaxForce = math.huge
+	flyAlignOrientation.Responsiveness = math.huge
+	flyAlignOrientation.Parent = hrp
+end
+
+local function cleanupFlyObjects()
+	if flyLinearVelocity then
+		flyLinearVelocity:Destroy()
+		flyLinearVelocity = nil
+	end
+	if flyAlignOrientation then
+		flyAlignOrientation:Destroy()
+		flyAlignOrientation = nil
+	end
+	if flyAttachment then
+		flyAttachment:Destroy()
+		flyAttachment = nil
+	end
+	isFlying = false
+end
+
+local function enableFly()
+	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		if not flyLinearVelocity then
+			setupFlyObjects(LocalPlayer.Character)
+		end
+		if flyLinearVelocity then
+			flyLinearVelocity.Enabled = true
+			isFlying = true
+			if LocalPlayer.Character:FindFirstChild("Humanoid") then
 				LocalPlayer.Character.Humanoid.Sit = true
 			end
-		end else
-		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-			LocalPlayer.Character.Humanoid.Sit = false
 		end
+	end
+end
+
+local function disableFly()
+	cleanupFlyObjects()
+	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+		LocalPlayer.Character.Humanoid.Sit = false
+		LocalPlayer.Character.Humanoid.PlatformStand = false
+	end
+end
+
+LocalPlayer.Chatted:Connect(function(message)
+	local cmd = message:lower()
+	if cmd == "/fly" then
+		enableFly()
+	elseif cmd == "/unfly" then
+		disableFly()
 	end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
 	isLocked = false
 	targetPlayer = nil
-	if isFlying then
-		isFlying = false
-	end
+
+	-- Reset fly state on respawn
+	cleanupFlyObjects()
+
+	-- Reset verified title
 	if verifiedTitleObject then
 		verifiedTitleObject:Destroy()
 		verifiedTitleObject = nil
 	end
-	if LocalPlayer.PlayerGui:FindFirstChild("AdvancedCheatGUI") then
-		local toggleFrame = espFrame:FindFirstChildWhichIsA("Frame")
-		if toggleFrame then
-			local toggleBtn = toggleFrame:FindFirstChild("TextButton")
-			if toggleBtn and toggleBtn.Text == "ON" then
-				wait()
-				local billboard = Instance.new("BillboardGui")
-				billboard.Name = "VerifiedTitle"
-				billboard.Size = UDim2.new(0, 200, 0, 50)
-				billboard.StudsOffset = Vector3.new(0, 3, 0)
-				if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-					billboard.Adornee = LocalPlayer.Character:FindFirstChild("Head")
-					billboard.Parent = LocalPlayer.Character:FindFirstChild("Head")
 
-					local label = Instance.new("TextLabel")
-					label.BackgroundTransparency = 1
-					label.Size = UDim2.new(1, 0, 1, 0)
-					label.Font = Enum.Font.GothamBold
-					label.Text = " " .. LocalPlayer.Name
-					label.TextColor3 = Color3.fromRGB(255, 255, 255)
-					label.TextSize = 24
-					label.TextStrokeTransparency = 0
-					label.Parent = billboard
+	-- Re-apply verified title if enabled
+	if isVerifiedTitleEnabled then
+		wait()
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+			local billboard = Instance.new("BillboardGui")
+			billboard.Name = "VerifiedTitle"
+			billboard.Size = UDim2.new(0, 200, 0, 50)
+			billboard.StudsOffset = Vector3.new(0, 3, 0)
+			billboard.Adornee = LocalPlayer.Character:FindFirstChild("Head")
+			billboard.Parent = LocalPlayer.Character:FindFirstChild("Head")
 
-					verifiedTitleObject = billboard
-				end
-			end
+			local label = Instance.new("TextLabel")
+			label.BackgroundTransparency = 1
+			label.Size = UDim2.new(1, 0, 1, 0)
+			label.Font = Enum.Font.GothamBold
+			label.Text = " " .. LocalPlayer.Name
+			label.TextColor3 = Color3.fromRGB(255, 255, 255)
+			label.TextSize = 24
+			label.TextStrokeTransparency = 0
+			label.Parent = billboard
+
+			verifiedTitleObject = billboard
 		end
 	end
 end)
@@ -558,15 +622,9 @@ RunService.RenderStepped:Connect(function()
 	end
 	updateESP()
 
-	if isFlying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-		local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-		local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-
-		if humanoid then
-			humanoid.Sit = true
-		end
-
+	if isFlying and flyLinearVelocity and flyAlignOrientation and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
 		local moveDirection = Vector3.new(0, 0, 0)
+
 		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
 			moveDirection = moveDirection + Camera.CFrame.LookVector
 		end
@@ -587,8 +645,10 @@ RunService.RenderStepped:Connect(function()
 		end
 
 		if moveDirection.Magnitude > 0 then
-			moveDirection = moveDirection.Unit
-			rootPart.CFrame = rootPart.CFrame + moveDirection * flySpeed * 0.016
+			flyLinearVelocity.VectorVelocity = moveDirection.Unit * flySpeed
+			flyAlignOrientation.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + Camera.CFrame.LookVector)
+		else
+			flyLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
 		end
 	end
 end)
