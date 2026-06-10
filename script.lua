@@ -14,8 +14,7 @@ local targetPlayer = nil
 local isMenuOpen = true
 local ESPEnabled = false
 local ESPObjects = {}
-local verifiedTitleObject = nil
-local isVerifiedTitleEnabled = false
+local noclipEnabled = false
 
 local function removeESP(p)
 	if ESPObjects[p] then
@@ -37,31 +36,6 @@ local function addESP(p)
 		h.Parent = p.Character
 		ESPObjects[p] = { Highlight = h }
 	end
-end
-
-local function applyVerifiedTitle()
-	if not isVerifiedTitleEnabled then return end
-	if verifiedTitleObject then verifiedTitleObject:Destroy() verifiedTitleObject = nil end
-	local char = LocalPlayer.Character
-	if not char then return end
-	local head = char:FindFirstChild("Head")
-	if not head then return end
-	local bb = Instance.new("BillboardGui")
-	bb.Name = "VerifiedTitle"
-	bb.Size = UDim2.new(0, 200, 0, 50)
-	bb.StudsOffset = Vector3.new(0, 3, 0)
-	bb.Adornee = head
-	bb.Parent = head
-	local lbl = Instance.new("TextLabel")
-	lbl.BackgroundTransparency = 1
-	lbl.Size = UDim2.new(1, 0, 1, 0)
-	lbl.Font = Enum.Font.GothamBold
-	lbl.Text = "✓ " .. LocalPlayer.Name
-	lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-	lbl.TextSize = 24
-	lbl.TextStrokeTransparency = 0
-	lbl.Parent = bb
-	verifiedTitleObject = bb
 end
 
 local Gui = Instance.new("ScreenGui")
@@ -99,7 +73,7 @@ local Title = Instance.new("TextLabel")
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, -44, 1, 0)
 Title.Position = UDim2.new(0, 12, 0, 0)
-Title.Text = "CHEAT SYSTEM"
+Title.Text = "Anynomus HUB - Zenn"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 15
 Title.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -136,9 +110,12 @@ TabFrame.Size = UDim2.new(1, -16, 0, 30)
 TabFrame.Position = UDim2.new(0, 8, 0, 46)
 TabFrame.Parent = Main
 
+local allTabs = {}
+local allPages = {}
+
 local function makeTabBtn(name, posX, active)
 	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.5, -4, 0, 26)
+	btn.Size = UDim2.new(0.333, -3, 0, 26)
 	btn.Position = posX
 	btn.BackgroundColor3 = active and Color3.fromRGB(42, 42, 42) or Color3.fromRGB(32, 32, 32)
 	btn.BorderSizePixel = 0
@@ -152,8 +129,9 @@ local function makeTabBtn(name, posX, active)
 	return btn
 end
 
-local aimTab = makeTabBtn("Aim Assist", UDim2.new(0, 0, 0, 0), true)
-local espTab = makeTabBtn("ESP / Visuals", UDim2.new(0.5, 4, 0, 0), false)
+local homeTab = makeTabBtn("Home", UDim2.new(0, 0, 0, 0), true)
+local aimTab = makeTabBtn("Aim Assist", UDim2.new(0.333, 2, 0, 0), false)
+local espTab = makeTabBtn("ESP / Visuals", UDim2.new(0.666, 4, 0, 0), false)
 
 local Content = Instance.new("Frame")
 Content.BackgroundTransparency = 1
@@ -162,24 +140,15 @@ Content.Position = UDim2.new(0, 8, 0, 82)
 Content.ClipsDescendants = true
 Content.Parent = Main
 
-local aimPage = Instance.new("ScrollingFrame")
-aimPage.BackgroundTransparency = 1
-aimPage.Size = UDim2.new(1, 0, 1, 0)
-aimPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
-aimPage.ScrollBarThickness = 3
-aimPage.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-aimPage.Parent = Content
-
-local espPage = Instance.new("ScrollingFrame")
-espPage.BackgroundTransparency = 1
-espPage.Size = UDim2.new(1, 0, 1, 0)
-espPage.Visible = false
-espPage.AutomaticCanvasSize = Enum.AutomaticSize.Y
-espPage.ScrollBarThickness = 3
-espPage.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-espPage.Parent = Content
-
-local function addPageLayout(page)
+local function makePage()
+	local page = Instance.new("ScrollingFrame")
+	page.BackgroundTransparency = 1
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	page.ScrollBarThickness = 3
+	page.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+	page.Visible = false
+	page.Parent = Content
 	local p = Instance.new("UIPadding")
 	p.PaddingTop = UDim.new(0, 4)
 	p.PaddingBottom = UDim.new(0, 4)
@@ -187,22 +156,38 @@ local function addPageLayout(page)
 	local l = Instance.new("UIListLayout")
 	l.Padding = UDim.new(0, 6)
 	l.Parent = page
+	return page
 end
 
-addPageLayout(aimPage)
-addPageLayout(espPage)
+local homePage = makePage()
+homePage.Visible = true
+local aimPage = makePage()
+local espPage = makePage()
 
-local function switchTab(a, b, show, hide)
-	a.BackgroundColor3 = Color3.fromRGB(42, 42, 42)
-	a.TextColor3 = Color3.fromRGB(0, 255, 170)
-	b.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
-	b.TextColor3 = Color3.fromRGB(150, 150, 150)
-	show.Visible = true
-	hide.Visible = false
+allTabs = {homeTab, aimTab, espTab}
+allPages = {homePage, aimPage, espPage}
+
+local function switchTab(activeIdx)
+	for i, tab in ipairs(allTabs) do
+		local isActive = i == activeIdx
+		tab.BackgroundColor3 = isActive and Color3.fromRGB(42, 42, 42) or Color3.fromRGB(32, 32, 32)
+		tab.TextColor3 = isActive and Color3.fromRGB(0, 255, 170) or Color3.fromRGB(150, 150, 150)
+		allPages[i].Visible = isActive
+	end
 end
 
-aimTab.MouseButton1Click:Connect(function() switchTab(aimTab, espTab, aimPage, espPage) end)
-espTab.MouseButton1Click:Connect(function() switchTab(espTab, aimTab, espPage, aimPage) end)
+homeTab.MouseButton1Click:Connect(function() switchTab(1) end)
+aimTab.MouseButton1Click:Connect(function() switchTab(2) end)
+espTab.MouseButton1Click:Connect(function() switchTab(3) end)
+
+local homeTitle = Instance.new("TextLabel")
+homeTitle.BackgroundTransparency = 1
+homeTitle.Size = UDim2.new(1, 0, 0, 30)
+homeTitle.Text = "-- Commands --"
+homeTitle.Font = Enum.Font.GothamBold
+homeTitle.TextSize = 14
+homeTitle.TextColor3 = Color3.fromRGB(0, 255, 170)
+homeTitle.Parent = homePage
 
 local function createToggle(parent, text, default, callback)
 	local frame = Instance.new("Frame")
@@ -250,6 +235,51 @@ local function createToggle(parent, text, default, callback)
 	end)
 end
 
+local function createCheckbox(parent, text, default, callback)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 0, 36)
+	frame.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+	local state = default
+	local box = Instance.new("TextButton")
+	box.Size = UDim2.new(0, 20, 0, 20)
+	box.Position = UDim2.new(1, -30, 0.5, -10)
+	box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	box.BorderSizePixel = 0
+	box.Text = state and "✓" or ""
+	box.Font = Enum.Font.GothamBold
+	box.TextSize = 14
+	box.TextColor3 = Color3.fromRGB(0, 255, 170)
+	box.AutoButtonColor = false
+	box.Parent = frame
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, -40, 1, 0)
+	label.Position = UDim2.new(0, 12, 0, 0)
+	label.Text = text
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 13
+	label.TextColor3 = Color3.fromRGB(210, 210, 210)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = frame
+
+	box.MouseButton1Click:Connect(function()
+		state = not state
+		box.Text = state and "✓" or ""
+		box.BackgroundColor3 = state and Color3.fromRGB(0, 170, 120) or Color3.fromRGB(50, 50, 50)
+		if callback then callback(state) end
+	end)
+end
+
+createCheckbox(homePage, "Noclip", false, function(s)
+	noclipEnabled = s
+end)
+
 createToggle(aimPage, "Enable Aim Assist (F)", false, function(s)
 	if s then isLocked = false targetPlayer = nil end
 end)
@@ -262,16 +292,6 @@ createToggle(espPage, "Enable ESP (Highlight)", false, function(s)
 		for _, p in ipairs(Players:GetPlayers()) do
 			if p ~= LocalPlayer then addESP(p) end
 		end
-	end
-end)
-
-createToggle(espPage, "Verified Title", false, function(s)
-	isVerifiedTitleEnabled = s
-	if s then
-		applyVerifiedTitle()
-	elseif verifiedTitleObject then
-		verifiedTitleObject:Destroy()
-		verifiedTitleObject = nil
 	end
 end)
 
@@ -348,13 +368,21 @@ Players.PlayerRemoving:Connect(removeESP)
 LocalPlayer.CharacterAdded:Connect(function()
 	isLocked = false
 	targetPlayer = nil
-	if verifiedTitleObject then verifiedTitleObject:Destroy() verifiedTitleObject = nil end
-	task.defer(applyVerifiedTitle)
 end)
 
 for _, p in ipairs(Players:GetPlayers()) do
 	if p ~= LocalPlayer then addESP(p) end
 end
+
+RunService.Stepped:Connect(function()
+	if noclipEnabled and LocalPlayer.Character then
+		for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end
+end)
 
 RunService.RenderStepped:Connect(function()
 	if isLocked and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
