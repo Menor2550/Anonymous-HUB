@@ -1,5 +1,5 @@
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local UserInputService = game:GetService("UserInputService)
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -11,7 +11,6 @@ local MAX_DISTANCE = 150
 
 local isLocked = false
 local targetPlayer = nil
-local connection = nil
 local isMenuOpen = true
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -72,16 +71,22 @@ local ContentCorner = Instance.new("UICorner")
 ContentCorner.CornerRadius = UDim.new(0, 10)
 ContentCorner.Parent = ContentFrame
 
+local DragHandle = Instance.new("Frame")
+DragHandle.BackgroundTransparency = 1
+DragHandle.Size = UDim2.new(1, 0, 0, 50)
+DragHandle.Position = UDim2.new(0, 0, 0, 0)
+DragHandle.Parent = ContentFrame
+
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Size = UDim2.new(1, 0, 0, 50)
-TitleLabel.Position = UDim2.new(0, 15, 0, 10)
+TitleLabel.Position = UDim2.new(0, 15, 0, 0)
 TitleLabel.Text = "AIM ASSIST SYSTEM"
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 22
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.Parent = ContentFrame
+TitleLabel.Parent = DragHandle
 
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.BackgroundTransparency = 1
@@ -98,7 +103,7 @@ local InstructionLabel = Instance.new("TextLabel")
 InstructionLabel.BackgroundTransparency = 1
 InstructionLabel.Size = UDim2.new(1, 0, 0, 60)
 InstructionLabel.Position = UDim2.new(0, 15, 0, 90)
-InstructionLabel.Text = "Press [F] to toggle lock\nPress [R] to reset\nPress [K] to toggle menu"
+InstructionLabel.Text = "Press [F] to toggle lock\nPress [K] to toggle menu"
 InstructionLabel.Font = Enum.Font.Gotham
 InstructionLabel.TextSize = 12
 InstructionLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -130,6 +135,47 @@ local function updateStatus(statusText, color)
 	StatusLabel.Text = "Status: " .. statusText
 	StatusLabel.TextColor3 = color
 end
+
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPos = nil
+
+local function update(input)
+	local delta = input.Position - dragStart
+	NotificationFrame.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end
+
+DragHandle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = NotificationFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+DragHandle.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.TouchMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
 
 local function getNearestPlayer()
 	local nearest = nil
@@ -198,13 +244,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 				updateStatus("No Target Found", Color3.fromRGB(255, 0, 0))
 			end
 		end
-		return
-	end
-
-	if input.KeyCode == RESET_KEY then
-		isLocked = false
-		targetPlayer = nil
-		updateStatus("Reset", Color3.fromRGB(255, 165, 0))
 		return
 	end
 end)
