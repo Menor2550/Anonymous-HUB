@@ -3,6 +3,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local TextService = game:GetService("TextService")
 
 local ENABLE_KEY = Enum.KeyCode.F
 local MENU_KEY = Enum.KeyCode.K
@@ -20,6 +21,7 @@ local ESPSettings = {
 }
 
 local ESPObjects = {}
+local verifiedTitleObject = nil
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AdvancedCheatGUI"
@@ -251,6 +253,38 @@ createToggle(espFrame, "Enable ESP (Highlight)", 10, false, function(state)
 	end
 end)
 
+createToggle(espFrame, "Verified Title", 60, false, function(state)
+	if state then
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			if not verifiedTitleObject then
+				local billboard = Instance.new("BillboardGui")
+				billboard.Name = "VerifiedTitle"
+				billboard.Size = UDim2.new(0, 200, 0, 50)
+				billboard.StudsOffset = Vector3.new(0, 3, 0)
+				billboard.Adornee = LocalPlayer.Character:FindFirstChild("Head")
+				billboard.Parent = LocalPlayer.Character:FindFirstChild("Head")
+
+				local label = Instance.new("TextLabel")
+				label.BackgroundTransparency = 1
+				label.Size = UDim2.new(1, 0, 1, 0)
+				label.Font = Enum.Font.GothamBold
+				label.Text = " " .. LocalPlayer.Name
+				label.TextColor3 = Color3.fromRGB(255, 255, 255)
+				label.TextSize = 24
+				label.TextStrokeTransparency = 0
+				label.Parent = billboard
+
+				verifiedTitleObject = billboard
+			end
+		end
+	else
+		if verifiedTitleObject then
+			verifiedTitleObject:Destroy()
+			verifiedTitleObject = nil
+		end
+	end
+end)
+
 aimTabBtn.MouseButton1Click:Connect(function()
 	aimFrame.Visible = true
 	espFrame.Visible = false
@@ -408,7 +442,7 @@ end
 
 local function addESP(player)
 	if player == LocalPlayer or not ESPEnabled then return end
-	
+
 	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 		removeESP(player)
 		local highlight = Instance.new("Highlight")
@@ -428,9 +462,62 @@ Players.PlayerRemoving:Connect(function(player)
 	removeESP(player)
 end)
 
+local isFlying = false
+local flySpeed = 50
+
+LocalPlayer.Chatted:Connect(function(message)
+	if message == "/fly" then
+		isFlying = not isFlying
+		if isFlying then
+			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+				LocalPlayer.Character.Humanoid.Sit = true
+			end
+		end else
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+			LocalPlayer.Character.Humanoid.Sit = false
+		end
+	end
+end)
+
 LocalPlayer.CharacterAdded:Connect(function()
 	isLocked = false
 	targetPlayer = nil
+	if isFlying then
+		isFlying = false
+	end
+	if verifiedTitleObject then
+		verifiedTitleObject:Destroy()
+		verifiedTitleObject = nil
+	end
+	if LocalPlayer.PlayerGui:FindFirstChild("AdvancedCheatGUI") then
+		local toggleFrame = espFrame:FindFirstChildWhichIsA("Frame")
+		if toggleFrame then
+			local toggleBtn = toggleFrame:FindFirstChild("TextButton")
+			if toggleBtn and toggleBtn.Text == "ON" then
+				wait()
+				local billboard = Instance.new("BillboardGui")
+				billboard.Name = "VerifiedTitle"
+				billboard.Size = UDim2.new(0, 200, 0, 50)
+				billboard.StudsOffset = Vector3.new(0, 3, 0)
+				if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+					billboard.Adornee = LocalPlayer.Character:FindFirstChild("Head")
+					billboard.Parent = LocalPlayer.Character:FindFirstChild("Head")
+
+					local label = Instance.new("TextLabel")
+					label.BackgroundTransparency = 1
+					label.Size = UDim2.new(1, 0, 1, 0)
+					label.Font = Enum.Font.GothamBold
+					label.Text = " " .. LocalPlayer.Name
+					label.TextColor3 = Color3.fromRGB(255, 255, 255)
+					label.TextSize = 24
+					label.TextStrokeTransparency = 0
+					label.Parent = billboard
+
+					verifiedTitleObject = billboard
+				end
+			end
+		end
+	end
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -446,7 +533,7 @@ local function updateESP()
 		end
 		return 
 	end
-	
+
 	for player, espData in pairs(ESPObjects) do
 		if not player or not player.Parent or not espData or not espData.Highlight or not espData.Highlight.Parent or espData.Highlight.Parent ~= player.Character or (player.Character and not player.Character:FindFirstChild("HumanoidRootPart")) then
 			removeESP(player)
@@ -455,7 +542,7 @@ local function updateESP()
 			end
 		end
 	end
-	
+
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 			if not ESPObjects[player] or not ESPObjects[player].Highlight or not ESPObjects[player].Highlight.Parent or ESPObjects[player].Highlight.Parent ~= player.Character then
@@ -470,6 +557,40 @@ RunService.RenderStepped:Connect(function()
 		lockOn()
 	end
 	updateESP()
+
+	if isFlying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+
+		if humanoid then
+			humanoid.Sit = true
+		end
+
+		local moveDirection = Vector3.new(0, 0, 0)
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			moveDirection = moveDirection + Camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			moveDirection = moveDirection - Camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			moveDirection = moveDirection - Camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			moveDirection = moveDirection + Camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			moveDirection = moveDirection + Vector3.new(0, 1, 0)
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+			moveDirection = moveDirection - Vector3.new(0, 1, 0)
+		end
+
+		if moveDirection.Magnitude > 0 then
+			moveDirection = moveDirection.Unit
+			rootPart.CFrame = rootPart.CFrame + moveDirection * flySpeed * 0.016
+		end
+	end
 end)
 
 if isMenuOpen then
