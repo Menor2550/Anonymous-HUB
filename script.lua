@@ -4,10 +4,9 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
-local ENABLE_KEY = Enum.KeyCode.F
-local MENU_KEY = Enum.KeyCode.K
 local AIM_STRENGTH = 0.16
 local MAX_DISTANCE = 150
+local MENU_KEY = Enum.KeyCode.K
 
 local isLocked = false
 local targetPlayer = nil
@@ -15,6 +14,10 @@ local isMenuOpen = true
 local ESPEnabled = false
 local ESPObjects = {}
 local noclipEnabled = false
+local headLockKey = Enum.KeyCode.F
+local listeningForKey = false
+local aimStrength = 0.16
+local maxDistance = 150
 
 local function removeESP(p)
 	if ESPObjects[p] then
@@ -85,7 +88,7 @@ CloseBtn.Size = UDim2.new(0, 26, 0, 26)
 CloseBtn.Position = UDim2.new(1, -34, 0, 7)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 CloseBtn.BorderSizePixel = 0
-CloseBtn.Text = "�"
+CloseBtn.Text = "×"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
 CloseBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
@@ -249,7 +252,7 @@ local function createCheckbox(parent, text, default, callback)
 	box.Position = UDim2.new(1, -30, 0.5, -10)
 	box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	box.BorderSizePixel = 0
-	box.Text = state and "?" or ""
+	box.Text = state and "✓" or ""
 	box.Font = Enum.Font.GothamBold
 	box.TextSize = 14
 	box.TextColor3 = Color3.fromRGB(0, 255, 170)
@@ -270,9 +273,91 @@ local function createCheckbox(parent, text, default, callback)
 
 	box.MouseButton1Click:Connect(function()
 		state = not state
-		box.Text = state and "?" or ""
+		box.Text = state and "✓" or ""
 		box.BackgroundColor3 = state and Color3.fromRGB(0, 170, 120) or Color3.fromRGB(50, 50, 50)
 		if callback then callback(state) end
+	end)
+end
+
+local function createSlider(parent, text, min, max, default, callback)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 0, 56)
+	frame.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+	frame.BorderSizePixel = 0
+	frame.Parent = parent
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, -16, 0, 20)
+	label.Position = UDim2.new(0, 12, 0, 4)
+	label.Text = text
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 13
+	label.TextColor3 = Color3.fromRGB(210, 210, 210)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = frame
+
+	local valLabel = Instance.new("TextLabel")
+	valLabel.BackgroundTransparency = 1
+	valLabel.Size = UDim2.new(0, 60, 0, 20)
+	valLabel.Position = UDim2.new(1, -72, 0, 4)
+	valLabel.Text = tostring(default)
+	valLabel.Font = Enum.Font.GothamMedium
+	valLabel.TextSize = 13
+	valLabel.TextColor3 = Color3.fromRGB(0, 255, 170)
+	valLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valLabel.Parent = frame
+
+	local sliderBg = Instance.new("Frame")
+	sliderBg.Size = UDim2.new(1, -24, 0, 8)
+	sliderBg.Position = UDim2.new(0, 12, 0, 32)
+	sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	sliderBg.BorderSizePixel = 0
+	sliderBg.Parent = frame
+	Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
+
+	local sliderFill = Instance.new("Frame")
+	sliderFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+	sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 120)
+	sliderFill.BorderSizePixel = 0
+	sliderFill.Parent = sliderBg
+	Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
+
+	local sliderBtn = Instance.new("TextButton")
+	sliderBtn.Size = UDim2.new(1, 0, 1, 0)
+	sliderBtn.BackgroundTransparency = 1
+	sliderBtn.Text = ""
+	sliderBtn.Parent = sliderBg
+
+	local sliding = false
+
+	sliderBtn.MouseButton1Down:Connect(function()
+		sliding = true
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			sliding = false
+		end
+	end)
+
+	sliderBtn.MouseMoved:Connect(function(x)
+		if not sliding then return end
+		local relX = math.clamp((x - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+		sliderFill.Size = UDim2.new(relX, 0, 1, 0)
+		local val = min + (max - min) * relX
+		valLabel.Text = string.format("%.2f", val)
+		if callback then callback(val) end
+	end)
+
+	sliderBtn.MouseButton1Down:Connect(function()
+		local x = UserInputService:GetMouseLocation().X
+		local relX = math.clamp((x - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+		sliderFill.Size = UDim2.new(relX, 0, 1, 0)
+		local val = min + (max - min) * relX
+		valLabel.Text = string.format("%.2f", val)
+		if callback then callback(val) end
 	end)
 end
 
@@ -280,8 +365,131 @@ createCheckbox(homePage, "Noclip", false, function(s)
 	noclipEnabled = s
 end)
 
-createToggle(aimPage, "Enable Aim Assist (F)", false, function(s)
-	if s then isLocked = false targetPlayer = nil end
+local gotoFrame = Instance.new("Frame")
+gotoFrame.Size = UDim2.new(1, 0, 0, 36)
+gotoFrame.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+gotoFrame.BorderSizePixel = 0
+gotoFrame.Parent = homePage
+Instance.new("UICorner", gotoFrame).CornerRadius = UDim.new(0, 6)
+
+local gotoLabel = Instance.new("TextLabel")
+gotoLabel.BackgroundTransparency = 1
+gotoLabel.Size = UDim2.new(0, 50, 1, 0)
+gotoLabel.Position = UDim2.new(0, 12, 0, 0)
+gotoLabel.Text = "Goto"
+gotoLabel.Font = Enum.Font.GothamMedium
+gotoLabel.TextSize = 13
+gotoLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+gotoLabel.TextXAlignment = Enum.TextXAlignment.Left
+gotoLabel.Parent = gotoFrame
+
+local gotoBox = Instance.new("TextBox")
+gotoBox.Size = UDim2.new(1, -120, 0, 22)
+gotoBox.Position = UDim2.new(0, 60, 0.5, -11)
+gotoBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+gotoBox.BorderSizePixel = 0
+gotoBox.PlaceholderText = "Username"
+gotoBox.Text = ""
+gotoBox.Font = Enum.Font.GothamMedium
+gotoBox.TextSize = 12
+gotoBox.TextColor3 = Color3.fromRGB(210, 210, 210)
+gotoBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+gotoBox.ClearTextOnFocus = false
+gotoBox.Parent = gotoFrame
+Instance.new("UICorner", gotoBox).CornerRadius = UDim.new(0, 4)
+
+local gotoBtn = Instance.new("TextButton")
+gotoBtn.Size = UDim2.new(0, 40, 0, 22)
+gotoBtn.Position = UDim2.new(1, -50, 0.5, -11)
+gotoBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 120)
+gotoBtn.BorderSizePixel = 0
+gotoBtn.Text = "Go"
+gotoBtn.Font = Enum.Font.GothamBold
+gotoBtn.TextSize = 12
+gotoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+gotoBtn.AutoButtonColor = false
+gotoBtn.Parent = gotoFrame
+Instance.new("UICorner", gotoBtn).CornerRadius = UDim.new(0, 4)
+
+local function doGoto()
+	local name = gotoBox.Text
+	if name == "" then return end
+	for _, p in ipairs(Players:GetPlayers()) do
+		if string.lower(p.Name) == string.lower(name) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			LocalPlayer.Character.HumanoidRootPart.CFrame = p.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+			break
+		end
+	end
+end
+
+gotoBtn.MouseButton1Click:Connect(doGoto)
+gotoBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then doGoto() end
+end)
+
+local keybindFrame = Instance.new("Frame")
+keybindFrame.Size = UDim2.new(1, 0, 0, 36)
+keybindFrame.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+keybindFrame.BorderSizePixel = 0
+keybindFrame.Parent = homePage
+Instance.new("UICorner", keybindFrame).CornerRadius = UDim.new(0, 6)
+
+local keybindLabel = Instance.new("TextLabel")
+keybindLabel.BackgroundTransparency = 1
+keybindLabel.Size = UDim2.new(1, -80, 1, 0)
+keybindLabel.Position = UDim2.new(0, 12, 0, 0)
+keybindLabel.Text = "Head-Lock Key"
+keybindLabel.Font = Enum.Font.GothamMedium
+keybindLabel.TextSize = 13
+keybindLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+keybindLabel.Parent = keybindFrame
+
+local keybindBtn = Instance.new("TextButton")
+keybindBtn.Size = UDim2.new(0, 60, 0, 22)
+keybindBtn.Position = UDim2.new(1, -70, 0.5, -11)
+keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+keybindBtn.BorderSizePixel = 0
+keybindBtn.Text = "F"
+keybindBtn.Font = Enum.Font.GothamBold
+keybindBtn.TextSize = 12
+keybindBtn.TextColor3 = Color3.fromRGB(0, 255, 170)
+keybindBtn.AutoButtonColor = false
+keybindBtn.Parent = keybindFrame
+Instance.new("UICorner", keybindBtn).CornerRadius = UDim.new(0, 4)
+
+keybindBtn.MouseButton1Click:Connect(function()
+	if listeningForKey then return end
+	listeningForKey = true
+	keybindBtn.Text = "..."
+	keybindBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 120)
+	local conn
+	conn = UserInputService.InputBegan:Connect(function(input, gpe)
+		if gpe then return end
+		if input.KeyCode == Enum.KeyCode.Unknown then return end
+		headLockKey = input.KeyCode
+		keybindBtn.Text = string.upper(input.KeyCode.Name)
+		keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		listeningForKey = false
+		conn:Disconnect()
+	end)
+end)
+
+local aimTitle = Instance.new("TextLabel")
+aimTitle.BackgroundTransparency = 1
+aimTitle.Size = UDim2.new(1, 0, 0, 30)
+aimTitle.Text = "-- Aim Settings --"
+aimTitle.Font = Enum.Font.GothamBold
+aimTitle.TextSize = 14
+aimTitle.TextColor3 = Color3.fromRGB(0, 255, 170)
+aimTitle.Parent = aimPage
+
+createSlider(aimPage, "Aim Strength", 0.01, 1, 0.16, function(val)
+	aimStrength = val
+end)
+
+createSlider(aimPage, "Max Distance", 10, 500, 150, function(val)
+	maxDistance = val
 end)
 
 createToggle(espPage, "Enable ESP (Highlight)", false, function(s)
@@ -322,7 +530,7 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 local function getNearestPlayer()
-	local nearest, nearestDist = nil, MAX_DISTANCE
+	local nearest, nearestDist = nil, maxDistance
 	local center = Camera.ViewportSize / 2
 	for _, p in ipairs(Players:GetPlayers()) do
 		if p ~= LocalPlayer and p.Character then
@@ -343,7 +551,7 @@ local function lockOn()
 	if not isLocked or not targetPlayer or not targetPlayer.Character then return end
 	local head = targetPlayer.Character:FindFirstChild("Head")
 	if not head or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-	Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, head.Position), AIM_STRENGTH)
+	Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, head.Position), aimStrength)
 end
 
 UserInputService.InputBegan:Connect(function(input, gpe)
@@ -351,7 +559,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	if input.KeyCode == MENU_KEY then
 		isMenuOpen = not isMenuOpen
 		Main.Visible = isMenuOpen
-	elseif input.KeyCode == ENABLE_KEY then
+	elseif input.KeyCode == headLockKey and not listeningForKey then
 		if isLocked then
 			isLocked = false
 			targetPlayer = nil
