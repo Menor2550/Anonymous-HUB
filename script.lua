@@ -85,7 +85,7 @@ CloseBtn.Size = UDim2.new(0, 26, 0, 26)
 CloseBtn.Position = UDim2.new(1, -34, 0, 7)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 CloseBtn.BorderSizePixel = 0
-CloseBtn.Text = "�"
+CloseBtn.Text = "×"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
 CloseBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
@@ -249,7 +249,7 @@ local function createCheckbox(parent, text, default, callback)
 	box.Position = UDim2.new(1, -30, 0.5, -10)
 	box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 	box.BorderSizePixel = 0
-	box.Text = state and "?" or ""
+	box.Text = state and "✓" or ""
 	box.Font = Enum.Font.GothamBold
 	box.TextSize = 14
 	box.TextColor3 = Color3.fromRGB(0, 255, 170)
@@ -270,7 +270,7 @@ local function createCheckbox(parent, text, default, callback)
 
 	box.MouseButton1Click:Connect(function()
 		state = not state
-		box.Text = state and "?" or ""
+		box.Text = state and "✓" or ""
 		box.BackgroundColor3 = state and Color3.fromRGB(0, 170, 120) or Color3.fromRGB(50, 50, 50)
 		if callback then callback(state) end
 	end)
