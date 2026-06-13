@@ -100,8 +100,15 @@ local function doDash()
 	local char = LocalPlayer.Character
 	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hrp or not hum then return end
 	dashCooldown = true
+	local isR15 = char:FindFirstChild("UpperTorso") ~= nil
+	local animId = isR15 and "rbxassetid://124894043563107" or "rbxassetid://84326852215881"
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animId
+	local track = hum:LoadAnimation(anim)
+	track:Play()
 	local bv = Instance.new("BodyVelocity")
 	bv.MaxForce = Vector3.new(math.huge, 0, math.huge)
 	bv.Velocity = Camera.CFrame.LookVector * dashPower
@@ -192,7 +199,7 @@ CloseBtn.Size = UDim2.new(0, 26, 0, 26)
 CloseBtn.Position = UDim2.new(1, -34, 0, 7)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 CloseBtn.BorderSizePixel = 0
-CloseBtn.Text = "×"
+CloseBtn.Text = "Ã—"
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 16
 CloseBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
